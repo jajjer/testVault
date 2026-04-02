@@ -1,0 +1,108 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    /** Global role from profile (admin | test_lead | tester). */
+    function userRole() {
+      return get(userPath(request.auth.uid)).data.role;
+    }
+
+    function userProfileExists() {
+      return exists(userPath(request.auth.uid));
+    }
+
+    /** Can create/edit suites, cases, runs, project settings (not result execution). */
+    function canManageQualityContent() {
+      return signedIn() && userProfileExists() &&
+        userRole() in ['admin', 'test_lead'];
+    }
+
+    function projectPath(projectId) {
+      return /databases/$(database)/documents/projects/$(projectId);
+    }
+
+    function isProjectMember(projectId) {
+      return signedIn() &&
+        exists(projectPath(projectId)) &&
+        request.auth.uid in get(projectPath(projectId)).data.memberIds;
+    }
+
+    /**
+     * Testers may only create/update run results (execute tests). They cannot write anything else.
+     * Leads/admins may also delete results; testers may not.
+     */
+    function canWriteRunResult(projectId) {
+      return isProjectMember(projectId) && userProfileExists() && (
+        canManageQualityContent() || userRole() == 'tester'
+      );
+    }
+
+    // --- Users (profile + role) ---
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+
+      // Registration: only own doc; lock role to tester (promotions via Console / admin tool).
+      allow create: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.role == 'tester';
+
+      // Profile edits: cannot self-escalate role.
+      allow update: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role;
+    }
+
+    // --- Projects ---
+    match /projects/{projectId} {
+      allow read: if isProjectMember(projectId);
+
+      allow create: if canManageQualityContent() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.auth.uid in request.resource.data.memberIds &&
+        request.resource.data.memberIds.size() == 1;
+
+      allow update: if isProjectMember(projectId) && canManageQualityContent();
+
+      allow delete: if isProjectMember(projectId) && canManageQualityContent();
+
+      // --- Suites & sections ---
+      match /suites/{suiteId} {
+        allow read: if isProjectMember(projectId);
+        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+
+        match /sections/{sectionId} {
+          allow read: if isProjectMember(projectId);
+          allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+        }
+      }
+
+      // --- Test cases (top-level under project in model) ---
+      match /testcases/{caseId} {
+        allow read: if isProjectMember(projectId);
+        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+      }
+
+      // --- Runs ---
+      match /runs/{runId} {
+        allow read: if isProjectMember(projectId);
+        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+
+        match /results/{caseId} {
+          allow read: if isProjectMember(projectId);
+          allow create, update: if canWriteRunResult(projectId);
+          allow delete: if isProjectMember(projectId) && canManageQualityContent();
+        }
+      }
+    }
+  }
+}
