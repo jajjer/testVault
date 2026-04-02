@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProjectLayout } from "@/components/layout/project-layout";
+import { PublicLayout } from "@/components/layout/public-layout";
 import { SyncedLayout } from "@/components/layout/synced-layout";
 import { LoginPage } from "@/pages/login-page";
 import { ProjectDashboardPage } from "@/pages/project-dashboard-page";
@@ -25,8 +26,10 @@ export default function App() {
     <BrowserRouter>
       <AuthBootstrap />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route element={<PublicLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<SyncedLayout />}>
             <Route element={<MainLayout />}>
