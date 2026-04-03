@@ -6,9 +6,13 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import { FileUp, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   FolderSidebar,
@@ -21,6 +25,7 @@ import {
   parseFolderDropId,
 } from "@/lib/test-case-dnd";
 import { TestCaseDialog } from "@/features/testcases/test-case-dialog";
+import { TestRailImportDialog } from "@/features/testcases/testrail-import-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,14 +38,15 @@ import { useSectionsSync } from "@/hooks/use-sections-sync";
 import { useTestCasesSync } from "@/hooks/use-test-cases-sync";
 import { DEFAULT_SECTION_ID } from "@/lib/test-case-defaults";
 import { formatTestCaseRef } from "@/lib/test-case-display";
+import { formatTestCaseFieldLabel } from "@/lib/test-case-field-options";
 import { cn } from "@/lib/utils";
 import { canManageContent, useAuthStore } from "@/store/auth-store";
 import { useSectionStore } from "@/store/section-store";
 import { useTestCaseStore } from "@/store/test-case-store";
-import type { SectionDoc, TestCaseDoc, TestCasePriority } from "@/types/models";
+import type { SectionDoc, TestCaseDoc } from "@/types/models";
 
-function priorityStyles(p: TestCasePriority) {
-  switch (p) {
+function priorityStyles(p: string) {
+  switch (p.toLowerCase()) {
     case "critical":
       return "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200";
     case "high":
@@ -48,7 +54,7 @@ function priorityStyles(p: TestCasePriority) {
     case "medium":
       return "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200";
     default:
-      return "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200";
+      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200";
   }
 }
 
@@ -77,8 +83,19 @@ function createInitialSectionId(folderFilter: FolderFilter): string {
   return folderFilter;
 }
 
+/** Only allow in-app paths for this project (avoids open redirects). */
+function isSafeReturnTo(path: string, projectId: string): boolean {
+  if (!path.startsWith("/")) return false;
+  if (path.includes("://")) return false;
+  return path.startsWith(`/projects/${projectId}/`);
+}
+
 export function TestCasesPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  /** After closing the edit dialog, navigate here (e.g. back to a test run). */
+  const returnToAfterEditRef = useRef<string | null>(null);
   useTestCasesSync(projectId);
   useSectionsSync(projectId);
 
@@ -91,9 +108,45 @@ export function TestCasesPage() {
 
   const [folderFilter, setFolderFilter] = useState<FolderFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<TestCaseDoc | null>(null);
 
   const canWrite = profile && canManageContent(profile.role);
+
+  /** Open edit dialog when navigating with `?case=<caseId>` (e.g. from a test run). */
+  useEffect(() => {
+    if (!projectId) return;
+    const openCaseId = searchParams.get("case");
+    if (!openCaseId) return;
+    if (loading) return;
+
+    const rawReturn = searchParams.get("returnTo");
+    returnToAfterEditRef.current = null;
+    if (rawReturn) {
+      try {
+        const decoded = decodeURIComponent(rawReturn);
+        if (isSafeReturnTo(decoded, projectId)) {
+          returnToAfterEditRef.current = decoded;
+        }
+      } catch {
+        /* ignore malformed */
+      }
+    }
+
+    const match = cases.find((c) => c.id === openCaseId);
+    if (match) {
+      setEditing(match);
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("case");
+        next.delete("returnTo");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [projectId, loading, cases, searchParams, setSearchParams]);
 
   const filtered = useMemo(
     () => filterCases(cases, folderFilter),
@@ -149,13 +202,25 @@ export function TestCasesPage() {
         </div>
         {canWrite ? (
           <>
-            <Button
-              className="shrink-0 gap-2"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              New test case
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setImportOpen(true)}
+              >
+                <FileUp className="h-4 w-4" />
+                Import from TestRail
+              </Button>
+              <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                New test case
+              </Button>
+            </div>
+            <TestRailImportDialog
+              projectId={projectId}
+              open={importOpen}
+              onOpenChange={setImportOpen}
+            />
             <TestCaseDialog
               projectId={projectId}
               mode="create"
@@ -172,7 +237,14 @@ export function TestCasesPage() {
                 testCase={editing}
                 open
                 onOpenChange={(o) => {
-                  if (!o) setEditing(null);
+                  if (!o) {
+                    setEditing(null);
+                    const dest = returnToAfterEditRef.current;
+                    returnToAfterEditRef.current = null;
+                    if (dest) {
+                      navigate(dest, { replace: true });
+                    }
+                  }
                 }}
               />
             ) : null}
@@ -247,7 +319,10 @@ export function TestCasesPage() {
                           showFolderColumn={showFolderColumn}
                           sections={sections}
                           canWrite={!!canWrite}
-                          onEdit={() => setEditing(c)}
+                          onEdit={() => {
+                            returnToAfterEditRef.current = null;
+                            setEditing(c);
+                          }}
                           onDelete={() => void onDelete(c)}
                         />
                       ))}
@@ -323,10 +398,12 @@ function TestCaseTableRow({
             priorityStyles(c.priority)
           )}
         >
-          {label(c.priority)}
+          {formatTestCaseFieldLabel(c.priority)}
         </span>
       </td>
-      <td className="px-4 py-3 text-muted-foreground">{label(c.type)}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {formatTestCaseFieldLabel(c.type)}
+      </td>
       <td className="px-4 py-3 text-muted-foreground">{label(c.status)}</td>
       <td className="px-4 py-3 text-muted-foreground tabular-nums">
         {c.steps.length}

@@ -15,6 +15,7 @@ import type {
   ProjectDoc,
   ProjectMember,
   ProjectParameter,
+  UserRole,
 } from "@/types/models";
 
 interface ProjectState {
@@ -22,7 +23,8 @@ interface ProjectState {
   loading: boolean;
   /** Set when the Firestore listener fails (e.g. permission or rules/query mismatch). */
   error: string | null;
-  listen: (uid: string) => Unsubscribe;
+  /** For `admin`, subscribes to all projects; otherwise projects where the user is a member. */
+  listen: (uid: string, role: UserRole) => Unsubscribe;
   stop: () => void;
   createProject: (input: {
     name: string;
@@ -39,6 +41,10 @@ interface ProjectState {
       name: string;
       description: string;
       parameters: ProjectParameter[];
+      /** When provided (e.g. admin save), replaces project test case priority list. */
+      testCasePriorityOptions?: string[];
+      /** When provided, replaces project test case type list. */
+      testCaseTypeOptions?: string[];
     }
   ) => Promise<void>;
 }
@@ -52,7 +58,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   loading: true,
   error: null,
 
-  listen: (uid: string) => {
+  listen: (uid: string, role: UserRole) => {
     if (activeUnsub) {
       activeUnsub();
       activeUnsub = null;
@@ -65,10 +71,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       set({ loading: true, error: null });
     }
 
-    const q = query(
-      collection(getFirestoreDb(), "projects"),
-      where("memberIds", "array-contains", uid)
-    );
+    const coll = collection(getFirestoreDb(), "projects");
+    const q =
+      role === "admin"
+        ? query(coll)
+        : query(coll, where("memberIds", "array-contains", uid));
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -76,6 +83,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
           const data = d.data() as Omit<ProjectDoc, "id" | "parameters"> & {
             parameters?: ProjectParameter[];
             nextCaseNumber?: number;
+            nextRunTestNumber?: number;
+            testCasePriorityOptions?: unknown;
+            testCaseTypeOptions?: unknown;
           };
           return {
             id: d.id,
@@ -85,6 +95,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
               typeof data.nextCaseNumber === "number" && data.nextCaseNumber >= 1
                 ? data.nextCaseNumber
                 : 1,
+            nextRunTestNumber:
+              typeof data.nextRunTestNumber === "number" &&
+              data.nextRunTestNumber >= 1
+                ? data.nextRunTestNumber
+                : 1,
+            testCasePriorityOptions: Array.isArray(data.testCasePriorityOptions)
+              ? data.testCasePriorityOptions.map((x) => String(x))
+              : undefined,
+            testCaseTypeOptions: Array.isArray(data.testCaseTypeOptions)
+              ? data.testCaseTypeOptions.map((x) => String(x))
+              : undefined,
           };
         });
         projects.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -123,6 +144,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       description,
       parameters: [],
       nextCaseNumber: 1,
+      nextRunTestNumber: 1,
       memberIds: [owner.uid],
       members: [member],
       createdBy: owner.uid,
@@ -136,6 +158,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       description,
       parameters: [],
       nextCaseNumber: 1,
+      nextRunTestNumber: 1,
       memberIds: [owner.uid],
       members: [member],
       createdBy: owner.uid,
@@ -157,6 +180,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
       description: updates.description,
       parameters: updates.parameters,
       updatedAt: now,
+      ...(updates.testCasePriorityOptions !== undefined
+        ? { testCasePriorityOptions: updates.testCasePriorityOptions }
+        : {}),
+      ...(updates.testCaseTypeOptions !== undefined
+        ? { testCaseTypeOptions: updates.testCaseTypeOptions }
+        : {}),
     });
     set((state) => ({
       projects: state.projects.map((p) =>
@@ -167,6 +196,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
               description: updates.description,
               parameters: updates.parameters,
               updatedAt: now,
+              ...(updates.testCasePriorityOptions !== undefined
+                ? { testCasePriorityOptions: updates.testCasePriorityOptions }
+                : {}),
+              ...(updates.testCaseTypeOptions !== undefined
+                ? { testCaseTypeOptions: updates.testCaseTypeOptions }
+                : {}),
             }
           : p
       ),

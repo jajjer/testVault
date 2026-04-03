@@ -36,6 +36,15 @@ service cloud.firestore {
         get(projectPath(projectId)).data.memberIds.hasAny([request.auth.uid]);
     }
 
+    /** App admins can access any project (listing + nested data) without being in memberIds. */
+    function isGlobalAdmin() {
+      return userProfileExists() && userRole() == 'admin';
+    }
+
+    function canAccessProjectData(projectId) {
+      return isProjectMember(projectId) || isGlobalAdmin();
+    }
+
     /**
      * Membership for the project document itself (read/update/delete on /projects/{id}).
      * Uses resource.data only (no get()). For list queries, use hasAny([uid]) — it matches
@@ -52,7 +61,7 @@ service cloud.firestore {
      * Leads/admins may also delete results; testers may not.
      */
     function canWriteRunResult(projectId) {
-      return isProjectMember(projectId) && userProfileExists() && (
+      return canAccessProjectData(projectId) && userProfileExists() && (
         canManageQualityContent() || userRole() == 'tester'
       );
     }
@@ -75,43 +84,43 @@ service cloud.firestore {
 
     // --- Projects ---
     match /projects/{projectId} {
-      allow read: if isProjectDocMember();
+      allow read: if isProjectDocMember() || isGlobalAdmin();
 
       allow create: if canManageQualityContent() &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.memberIds.hasAny([request.auth.uid]) &&
         request.resource.data.memberIds.size() == 1;
 
-      allow update: if isProjectDocMember() && canManageQualityContent();
+      allow update: if (isProjectDocMember() || isGlobalAdmin()) && canManageQualityContent();
 
-      allow delete: if isProjectDocMember() && canManageQualityContent();
+      allow delete: if (isProjectDocMember() || isGlobalAdmin()) && canManageQualityContent();
 
       // --- Suites & sections ---
       match /suites/{suiteId} {
-        allow read: if isProjectMember(projectId);
-        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+        allow read: if canAccessProjectData(projectId);
+        allow create, update, delete: if canAccessProjectData(projectId) && canManageQualityContent();
 
         match /sections/{sectionId} {
-          allow read: if isProjectMember(projectId);
-          allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+          allow read: if canAccessProjectData(projectId);
+          allow create, update, delete: if canAccessProjectData(projectId) && canManageQualityContent();
         }
       }
 
       // --- Test cases (top-level under project in model) ---
       match /testcases/{caseId} {
-        allow read: if isProjectMember(projectId);
-        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+        allow read: if canAccessProjectData(projectId);
+        allow create, update, delete: if canAccessProjectData(projectId) && canManageQualityContent();
       }
 
       // --- Runs ---
       match /runs/{runId} {
-        allow read: if isProjectMember(projectId);
-        allow create, update, delete: if isProjectMember(projectId) && canManageQualityContent();
+        allow read: if canAccessProjectData(projectId);
+        allow create, update, delete: if canAccessProjectData(projectId) && canManageQualityContent();
 
         match /results/{caseId} {
-          allow read: if isProjectMember(projectId);
+          allow read: if canAccessProjectData(projectId);
           allow create, update: if canWriteRunResult(projectId);
-          allow delete: if isProjectMember(projectId) && canManageQualityContent();
+          allow delete: if canAccessProjectData(projectId) && canManageQualityContent();
         }
       }
     }

@@ -33,9 +33,24 @@ export interface ProjectDoc {
    * creating a test case. Omitted on older projects until first case is created.
    */
   nextCaseNumber?: number;
+  /**
+   * Next run-test label (T1, T2…) to assign **project-wide** — unique across all test
+   * runs in this project. Updated atomically when adding cases to a run.
+   */
+  nextRunTestNumber?: number;
   /** Denormalized for `array-contains` queries. */
   memberIds: string[];
   members: ProjectMember[];
+  /**
+   * Allowed priority values for test cases in this project (stored as the string
+   * saved on each case). When omitted, the app uses built-in defaults.
+   */
+  testCasePriorityOptions?: string[];
+  /**
+   * Allowed type values for test cases in this project. When omitted, the app
+   * uses built-in defaults.
+   */
+  testCaseTypeOptions?: string[];
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -62,18 +77,17 @@ export interface SectionDoc {
   updatedAt: number;
 }
 
-export type TestCasePriority = "low" | "medium" | "high" | "critical";
+/**
+ * Stored value for test case priority — should match an entry from the project's
+ * `testCasePriorityOptions` (or built-in defaults).
+ */
+export type TestCasePriority = string;
 
-export type TestCaseType =
-  | "functional"
-  | "regression"
-  | "smoke"
-  | "integration"
-  | "ui"
-  | "api"
-  | "security"
-  | "performance"
-  | "other";
+/**
+ * Stored value for test case type — should match an entry from the project's
+ * `testCaseTypeOptions` (or built-in defaults).
+ */
+export type TestCaseType = string;
 
 export type TestCaseStatus = "active" | "draft" | "deprecated";
 
@@ -113,6 +127,11 @@ export interface TestRunDoc {
   suiteId: string;
   /** Test case IDs included in this run (snapshot of selection). */
   caseIds: string[];
+  /**
+   * Maps case id → **project-unique** T number (shared counter on the project).
+   * A given T value appears at most once across all runs in the project.
+   */
+  runTestNumbers?: Record<string, number>;
   status: RunStatus;
   createdBy: string;
   createdAt: number;

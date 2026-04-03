@@ -1,4 +1,4 @@
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useLocation, useParams } from "react-router-dom";
 import { LayoutDashboard, ListChecks, PlayCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ const nav = [
 
 export function ProjectSidebar({ projectName }: { projectName: string }) {
   const { projectId } = useParams<{ projectId: string }>();
+  const location = useLocation();
   const base = `/projects/${projectId ?? ""}`;
 
   return (
@@ -28,15 +29,21 @@ export function ProjectSidebar({ projectName }: { projectName: string }) {
       <Separator className="bg-sidebar-border" />
       <ScrollArea className="flex-1 px-2 py-3">
         <nav className="flex flex-col gap-1">
-          {nav.map(({ to, label, icon: Icon, end }) => (
+          {nav.map(({ to, label, icon: Icon, end }) => {
+            const target = to === "" ? base : `${base}/${to}`;
+            const runsDetailActive =
+              to === "runs" &&
+              (location.pathname === `${base}/runs` ||
+                location.pathname.startsWith(`${base}/runs/`));
+            return (
             <NavLink
               key={label}
-              to={to === "" ? base : `${base}/${to}`}
+              to={target}
               end={end}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                  isActive
+                  isActive || runsDetailActive
                     ? "bg-sidebar-accent text-foreground"
                     : "text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground"
                 )
@@ -45,7 +52,8 @@ export function ProjectSidebar({ projectName }: { projectName: string }) {
               <Icon className="h-4 w-4 shrink-0" />
               {label}
             </NavLink>
-          ))}
+            );
+          })}
         </nav>
       </ScrollArea>
     </aside>

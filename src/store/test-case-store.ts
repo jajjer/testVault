@@ -35,6 +35,8 @@ interface TestCaseState {
       customFields: TestCaseDoc["customFields"];
       sectionId: string;
       createdBy: string;
+      /** When set (e.g. bulk import), avoids stale order from the live listener. */
+      order?: number;
     }
   ) => Promise<string>;
   updateTestCase: (
@@ -144,9 +146,11 @@ export const useTestCaseStore = create<TestCaseState>((set, get) => ({
     const now = Date.now();
     const existing = get().cases;
     const nextOrder =
-      existing.length === 0
-        ? 0
-        : Math.max(...existing.map((c) => c.order)) + 1;
+      typeof input.order === "number" && input.order >= 0
+        ? input.order
+        : existing.length === 0
+          ? 0
+          : Math.max(...existing.map((c) => c.order)) + 1;
 
     const newCaseRef = doc(
       collection(db, "projects", projectId, "testcases")

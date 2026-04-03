@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import { NewRunDialog } from "@/features/runs/new-run-dialog";
@@ -152,7 +152,12 @@ export function RunsPage() {
                       className="border-b border-border/60 last:border-0"
                     >
                       <td className="px-4 py-3 font-medium text-foreground">
-                        {r.name}
+                        <Link
+                          to={`/projects/${projectId}/runs/${r.id}`}
+                          className="hover:underline"
+                        >
+                          {r.name}
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <span

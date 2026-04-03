@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTestCaseRef } from "@/lib/test-case-display";
+import {
+  coerceToAllowedOption,
+  formatTestCaseFieldLabel,
+  getTestCasePriorityOptions,
+  getTestCaseTypeOptions,
+} from "@/lib/test-case-field-options";
 import { DEFAULT_SECTION_ID } from "@/lib/test-case-defaults";
 import {
   buildSectionTree,
@@ -28,7 +34,10 @@ import type {
   TestCaseStep,
   TestCaseType,
 } from "@/types/models";
+import { TestCaseRunHistorySection } from "@/features/testcases/test-case-run-history-section";
+import { useTestRunsSync } from "@/hooks/use-test-runs-sync";
 import { useAuthStore } from "@/store/auth-store";
+import { useProjectStore } from "@/store/project-store";
 import { useSectionStore } from "@/store/section-store";
 import { useTestCaseStore } from "@/store/test-case-store";
 
@@ -37,25 +46,6 @@ const selectClass = cn(
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   "disabled:cursor-not-allowed disabled:opacity-50"
 );
-
-const PRIORITIES: TestCasePriority[] = [
-  "low",
-  "medium",
-  "high",
-  "critical",
-];
-
-const TYPES: TestCaseType[] = [
-  "functional",
-  "regression",
-  "smoke",
-  "integration",
-  "ui",
-  "api",
-  "security",
-  "performance",
-  "other",
-];
 
 const STATUSES: TestCaseStatus[] = ["draft", "active", "deprecated"];
 
@@ -148,7 +138,20 @@ export function TestCaseDialog({
   const firebaseUser = useAuthStore((s) => s.firebaseUser);
   const sections = useSectionStore((s) => s.sections);
   const folderOptions = flattenSectionsDepthFirst(buildSectionTree(sections));
+  const project = useProjectStore((s) =>
+    s.projects.find((p) => p.id === projectId)
+  );
+  const priorityOptions = useMemo(
+    () => getTestCasePriorityOptions(project),
+    [project]
+  );
+  const typeOptions = useMemo(
+    () => getTestCaseTypeOptions(project),
+    [project]
+  );
   const prevOpenRef = useRef(false);
+
+  useTestRunsSync(projectId);
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
@@ -156,8 +159,10 @@ export function TestCaseDialog({
         setTitle(testCase.title);
         setPreconditions(testCase.preconditions);
         setStepRows(toStepRows(testCase.steps));
-        setPriority(testCase.priority);
-        setType(testCase.type);
+        setPriority(
+          coerceToAllowedOption(testCase.priority, priorityOptions)
+        );
+        setType(coerceToAllowedOption(testCase.type, typeOptions));
         setStatus(testCase.status);
         setCfRows(customFieldsToRows(testCase.customFields));
         setSectionId(testCase.sectionId || DEFAULT_SECTION_ID);
@@ -165,15 +170,22 @@ export function TestCaseDialog({
         setTitle("");
         setPreconditions("");
         setStepRows([newStep()]);
-        setPriority("medium");
-        setType("functional");
+        setPriority(priorityOptions[0] ?? "medium");
+        setType(typeOptions[0] ?? "functional");
         setStatus("draft");
         setCfRows([newCfRow()]);
         setSectionId(initialSectionId);
       }
     }
     prevOpenRef.current = open;
-  }, [open, mode, testCase, initialSectionId]);
+  }, [
+    open,
+    mode,
+    testCase,
+    initialSectionId,
+    priorityOptions,
+    typeOptions,
+  ]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -324,9 +336,9 @@ export function TestCaseDialog({
                     setPriority(e.target.value as TestCasePriority)
                   }
                 >
-                  {PRIORITIES.map((p) => (
+                  {priorityOptions.map((p) => (
                     <option key={p} value={p}>
-                      {label(p)}
+                      {formatTestCaseFieldLabel(p)}
                     </option>
                   ))}
                 </select>
@@ -339,9 +351,9 @@ export function TestCaseDialog({
                   value={type}
                   onChange={(e) => setType(e.target.value as TestCaseType)}
                 >
-                  {TYPES.map((t) => (
+                  {typeOptions.map((t) => (
                     <option key={t} value={t}>
-                      {label(t)}
+                      {formatTestCaseFieldLabel(t)}
                     </option>
                   ))}
                 </select>
@@ -505,6 +517,14 @@ export function TestCaseDialog({
               </div>
             </div>
           </div>
+
+          {mode === "edit" && testCase ? (
+            <TestCaseRunHistorySection
+              projectId={projectId}
+              caseId={testCase.id}
+              enabled={open && mode === "edit"}
+            />
+          ) : null}
 
           <DialogFooter>
             <Button
