@@ -94,7 +94,7 @@ export const useSectionStore = create<SectionState>((set, get) => ({
         set({ sections, loading: false });
       },
       (err) => {
-        console.error("[Railyard] sections listener:", err);
+        console.error("[TestVault] sections listener:", err);
         set({ loading: false });
       }
     );

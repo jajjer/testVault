@@ -4,7 +4,7 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 /**
- * Railyard uses Firebase for auth and data. For HIPAA-regulated workloads:
+ * Test Vault uses Firebase for auth and data. For HIPAA-regulated workloads:
  * - Prefer a dedicated GCP project with a signed BAA and Firebase/Google Cloud configured per policy.
  * - Avoid storing PHI/PII in test titles, steps, or attachments; treat attachments as sensitive.
  * - Enable audit logging, least-privilege IAM, and strict Firestore/Storage security rules in production.

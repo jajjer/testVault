@@ -18,7 +18,7 @@ export function useSectionsSync(projectId: string | undefined) {
         useSectionStore.getState().listen(projectId);
       })
       .catch((e) => {
-        console.error("[Railyard] ensureDefaultSuite:", e);
+        console.error("[TestVault] ensureDefaultSuite:", e);
       });
 
     return () => {

@@ -139,7 +139,7 @@ export const useTestRunStore = create<TestRunState>((set) => ({
         set({ runs, loading: false });
       },
       (err) => {
-        console.error("[Railyard] test runs listener:", err);
+        console.error("[TestVault] test runs listener:", err);
         set({ loading: false });
       }
     );

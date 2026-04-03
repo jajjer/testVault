@@ -10,7 +10,7 @@ export function PublicLayout() {
           to="/projects"
           className="text-lg font-semibold tracking-tight text-foreground"
         >
-          Railyard
+          Test Vault
         </Link>
         <ThemeToggle />
       </header>

@@ -33,7 +33,7 @@ export function MainHeader() {
           to="/projects"
           className="text-lg font-semibold tracking-tight text-foreground"
         >
-          Railyard
+          Test Vault
         </Link>
       </div>
       <div className="flex items-center gap-1">

@@ -124,7 +124,7 @@ export const useTestCaseStore = create<TestCaseState>((set, get) => ({
         set({ cases, loading: false });
       },
       (err) => {
-        console.error("[Railyard] test cases listener:", err);
+        console.error("[TestVault] test cases listener:", err);
         set({ loading: false });
       }
     );

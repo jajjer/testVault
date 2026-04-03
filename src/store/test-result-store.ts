@@ -109,7 +109,7 @@ export const useTestResultStore = create<TestResultState>((set) => ({
         set({ resultsByCaseId, loading: false });
       },
       (err) => {
-        console.error("[Railyard] run results listener:", err);
+        console.error("[TestVault] run results listener:", err);
         set({ loading: false });
       }
     );

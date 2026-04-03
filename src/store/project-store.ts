@@ -112,7 +112,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         set({ projects, loading: false, error: null });
       },
       (err) => {
-        console.error("[Railyard] projects listener:", err);
+        console.error("[TestVault] projects listener:", err);
         const message =
           err instanceof Error ? err.message : "Failed to load projects.";
         set({ loading: false, error: message });

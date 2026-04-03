@@ -1,4 +1,4 @@
-# Railyard
+# Test Vault
 
 Self-hosted, Firebase-backed test management: projects, nested folders for test cases, test runs, and pass/fail results—similar in spirit to tools like TestRail, but under your own Firebase project.
 

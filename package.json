@@ -1,5 +1,5 @@
 {
-  "name": "railyard",
+  "name": "testvault",
   "private": true,
   "version": "0.1.0",
   "license": "MIT",
@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy --only hosting,firestore,storage",
     "test": "vitest run",
     "test:watch": "vitest"
   },

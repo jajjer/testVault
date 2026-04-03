@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-const STORAGE_KEY = "railyard-theme";
+const STORAGE_KEY = "testvault-theme";
+const LEGACY_THEME_KEY = "railyard-theme";
 
 function applyDomTheme(theme: "light" | "dark") {
   if (typeof document === "undefined") return;
@@ -9,10 +10,15 @@ function applyDomTheme(theme: "light" | "dark") {
 
 function readStoredTheme(): "light" | "dark" {
   try {
-    const s =
-      typeof localStorage !== "undefined"
-        ? localStorage.getItem(STORAGE_KEY)
-        : null;
+    if (typeof localStorage === "undefined") return "light";
+    let s = localStorage.getItem(STORAGE_KEY);
+    if (s !== "dark" && s !== "light") {
+      const legacy = localStorage.getItem(LEGACY_THEME_KEY);
+      if (legacy === "dark" || legacy === "light") {
+        localStorage.setItem(STORAGE_KEY, legacy);
+        s = legacy;
+      }
+    }
     if (s === "dark" || s === "light") return s;
   } catch {
     /* ignore */

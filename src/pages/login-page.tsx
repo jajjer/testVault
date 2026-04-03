@@ -32,7 +32,7 @@ export function LoginPage() {
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
           <CardDescription>
-            Railyard — QA test management. Use your work email.
+            Test Vault — QA test management. Use your work email.
           </CardDescription>
         </CardHeader>
         <form
