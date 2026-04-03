@@ -9,8 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore,storage",
-    "test": "vitest run",
+    "deploy": "npm run build && firebase deploy --only hosting,firestore,storage,functions",
+    "test": "vitest run && npm --prefix functions test",
     "test:watch": "vitest"
   },
   "dependencies": {
